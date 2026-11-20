@@ -19,7 +19,7 @@ function say(t){status.textContent=t}
 if(!window.maplibregl||!window.pmtiles){say('Map libraries failed to load. Check internet access.');return}
 try{
  const protocol=new pmtiles.Protocol();maplibregl.addProtocol('pmtiles',protocol.tile);
- const archive='https://demo-bucket.protomaps.com/v4.pmtiles';
+ const archive='https://tiles.jasontally.com/basemap.pmtiles';
  const map=new maplibregl.Map({
  container:'map',center:[-80.85,33.85],zoom:6.5,minZoom:3,maxZoom:16,
  attributionControl:false,
