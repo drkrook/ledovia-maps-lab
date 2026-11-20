@@ -12,26 +12,24 @@
 <div class="note"><strong>Online-only proof of concept.</strong> This page uses an externally hosted Protomaps demonstration archive; it is not a South Carolina offline download. Internet is required. Offline packs, satellite imagery, terrain contours, routing and saved-location integration are <strong>not yet implemented</strong>. Existing Ledovia maps and saved data are untouched. Data attribution: © OpenStreetMap contributors (ODbL), Protomaps.</div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script>
+<script src="https://unpkg.com/@protomaps/basemaps@5.7.2/dist/basemaps.js"></script>
 <script>
 (()=>{'use strict';
 const status=document.getElementById('status');
 function say(t){status.textContent=t}
-if(!window.maplibregl||!window.pmtiles){say('Map libraries failed to load. Check internet access.');return}
+if(!window.maplibregl||!window.pmtiles||!window.basemaps){say('Map libraries failed to load. Check internet access.');return}
 try{
  const protocol=new pmtiles.Protocol();maplibregl.addProtocol('pmtiles',protocol.tile);
  const archive='https://tiles.jasontally.com/basemap.pmtiles';
  const map=new maplibregl.Map({
  container:'map',center:[-80.85,33.85],zoom:6.5,minZoom:3,maxZoom:16,
  attributionControl:false,
- style:{version:8,sources:{basemap:{type:'vector',url:'pmtiles://'+archive}},
- layers:[
- {id:'background',type:'background',paint:{'background-color':'#e6e9dc'}},
- {id:'land',type:'fill',source:'basemap','source-layer':'earth',paint:{'fill-color':'#e7eadf'}},
- {id:'water',type:'fill',source:'basemap','source-layer':'water',paint:{'fill-color':'#9ccdd0'}},
- {id:'roads-minor',type:'line',source:'basemap','source-layer':'roads',filter:['in',['get','kind'],['literal',['minor_road','other','path','service']]],paint:{'line-color':'#ffffff','line-width':['interpolate',['linear'],['zoom'],6,0.2,12,1.7,16,3.5]}},
- {id:'roads',type:'line',source:'basemap','source-layer':'roads',paint:{'line-color':'#c79b75','line-width':['interpolate',['linear'],['zoom'],5,0.35,10,1.5,15,4]}},
- {id:'boundaries',type:'line',source:'basemap','source-layer':'boundaries',paint:{'line-color':'#a0aaa4','line-width':0.6,'line-dasharray':[3,2]}}
- ]},
+ style:{version:8,
+ glyphs:'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+ sprite:'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
+ sources:{basemap:{type:'vector',url:'pmtiles://'+archive,attribution:'© OpenStreetMap contributors'}},
+ layers:basemaps.layers('basemap',basemaps.namedFlavor('light'),{lang:'en'})
+ },
  transformRequest:(url)=>({url})
  });
  map.addControl(new maplibregl.NavigationControl({showCompass:true}),'top-right');
