@@ -6,10 +6,10 @@
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#061e26;color:#eaf6f5}*{box-sizing:border-box}body{margin:0}header{padding:15px 18px;background:#082b35;border-bottom:1px solid #23515a}h1{font-size:21px;margin:0}header p{margin:5px 0 0;color:#b2d2d4;font-size:13px}.bar{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;background:#0b3540;align-items:center}button{background:#164a58;color:#fff;border:1px solid #5d8991;border-radius:9px;padding:10px 13px;font-weight:650}button:focus-visible{outline:3px solid #ffd080}#map{width:100%;height:min(72vh,760px);min-height:350px;background:#dce6dc}.note{font-size:13px;line-height:1.5;padding:10px 16px;color:#d2e5e4}#status{padding:9px 13px;background:#123b45;font-size:13px}a{color:#a8e7f5}.maplibregl-ctrl-attrib{color:#222} .maplibregl-ctrl-attrib a{color:#174d66}
 </style></head><body>
 <header><h1>LEDO<span style="color:#6bd5c6">VIA</span> · Maps 2.0 Lab</h1><p>South Carolina isolated MapLibre + PMTiles rendering test · not the production map</p></header>
-<div class="bar"><button id="florence">Florence</button><button id="greenville">Greenville</button><button id="charleston">Charleston</button><button id="locate">My GPS</button><button id="reset">Reset view</button><button id="topo" aria-pressed="false">Topographic: Off</button><button id="relief" aria-pressed="false">Terrain Relief: Off</button></div>
+<div class="bar"><button id="florence">Florence</button><button id="greenville">Greenville</button><button id="charleston">Charleston</button><button id="locate">My GPS</button><button id="reset">Reset view</button><button id="topo" aria-pressed="false">Topographic: Off</button><button id="relief" aria-pressed="false">Terrain Relief: Off</button><button id="satellite" aria-pressed="false">Satellite: Off</button></div>
 <div id="status" role="status" aria-live="polite">Loading MapLibre and PMTiles…</div>
 <div id="map" aria-label="Experimental South Carolina vector map"></div>
-<div class="note"><strong>Online-only proof of concept.</strong> This page uses an externally hosted Protomaps demonstration archive; it is not a South Carolina offline download. Internet is required. Offline packs, satellite imagery, custom terrain contours, routing and saved-location integration are <strong>not yet implemented</strong>. Existing Ledovia maps and saved data are untouched. Topographic and Terrain Relief modes use live USGS The National Map tiles; availability and offline rights are not yet validated. Data attribution: © OpenStreetMap contributors (ODbL), Protomaps, USGS.</div>
+<div class="note"><strong>Online-only proof of concept.</strong> This page uses an externally hosted Protomaps demonstration archive; it is not a South Carolina offline download. Internet is required. Offline packs, downloadable satellite imagery, custom terrain contours, routing and saved-location integration are <strong>not yet implemented</strong>. Existing Ledovia maps and saved data are untouched. Topographic, Terrain Relief, and Satellite modes use live USGS The National Map tiles; satellite resolution and imagery dates vary by area; availability and offline rights are not yet validated. Data attribution: © OpenStreetMap contributors (ODbL), Protomaps, USGS.</div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script>
 <script src="https://unpkg.com/@protomaps/basemaps@5.7.2/dist/basemaps.js"></script>
@@ -53,6 +53,32 @@ try{
    say(reliefActive?'Terrain Relief: USGS hillshade blended with map. Online only.':'Terrain Relief off. Base map retained.');
   }catch(err){say('Terrain relief error: '+err.message)}
  };
+ const satelliteButton=document.getElementById('satellite');
+ let satelliteActive=false;
+ satelliteButton.onclick=()=>{
+  try{
+   if(!map.getSource('usgs-satellite')){
+    map.addSource('usgs-satellite',{type:'raster',tiles:['https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}'],tileSize:256,maxzoom:16,attribution:'USDA, USGS The National Map: Orthoimagery'});
+    const firstLabel=map.getStyle().layers.find(layer=>layer.type==='symbol');
+    map.addLayer({id:'usgs-satellite-overlay',type:'raster',source:'usgs-satellite',layout:{visibility:'none'},paint:{'raster-opacity':1}},firstLabel?.id);
+   }
+   satelliteActive=!satelliteActive;
+   if(satelliteActive&&topoActive){
+    topoActive=false;
+    map.setLayoutProperty('usgs-topo-overlay','visibility','none');
+    topoButton.textContent='Topographic: Off';
+    topoButton.setAttribute('aria-pressed','false');
+   }
+   map.setLayoutProperty('usgs-satellite-overlay','visibility',satelliteActive?'visible':'none');
+   if(reliefActive&&map.getLayer('usgs-relief-overlay')){
+    const firstLabel=map.getStyle().layers.find(layer=>layer.type==='symbol');
+    map.moveLayer('usgs-relief-overlay',firstLabel?.id);
+   }
+   satelliteButton.textContent='Satellite: '+(satelliteActive?'On':'Off');
+   satelliteButton.setAttribute('aria-pressed',String(satelliteActive));
+   say(satelliteActive?'Satellite imagery: USGS aerial tiles with vector labels. Online only; resolution varies.':'Satellite off. Standard or topographic map retained.');
+  }catch(err){say('Satellite layer error: '+err.message)}
+ };
  const topoButton=document.getElementById('topo');
  let topoActive=false;
  topoButton.onclick=()=>{
@@ -63,6 +89,12 @@ try{
     map.addLayer({id:'usgs-topo-overlay',type:'raster',source:'usgs-topo',layout:{visibility:'none'},paint:{'raster-opacity':1}},firstLabel?.id);
    }
    topoActive=!topoActive;
+   if(topoActive&&satelliteActive){
+    satelliteActive=false;
+    map.setLayoutProperty('usgs-satellite-overlay','visibility','none');
+    satelliteButton.textContent='Satellite: Off';
+    satelliteButton.setAttribute('aria-pressed','false');
+   }
    map.setLayoutProperty('usgs-topo-overlay','visibility',topoActive?'visible':'none');
    topoButton.textContent='Topographic: '+(topoActive?'On':'Off');
    topoButton.setAttribute('aria-pressed',String(topoActive));
