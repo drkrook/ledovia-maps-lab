@@ -1,0 +1,59 @@
+name: SC offline PMTiles extraction experiment
+on:
+  workflow_dispatch:
+    inputs:
+      source_pmtiles_url:
+        description: 'Verified Protomaps basemap PMTiles URL (https://build.protomaps.com/YYYYMMDD.pmtiles)'
+        required: true
+        type: string
+jobs:
+  extract-sc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      - name: Check out isolated Maps Lab
+        uses: actions/checkout@v4
+      - name: Install PMTiles CLI from official release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,urllib.request,os
+          req=urllib.request.Request('https://api.github.com/repos/protomaps/go-pmtiles/releases/latest',headers={'User-Agent':'Ledovia-Maps-Lab'})
+          with urllib.request.urlopen(req,timeout=30) as response: release=json.load(response)
+          assets=release.get('assets',[])
+          candidates=[a for a in assets if 'linux' in a['name'].lower() and ('amd64' in a['name'].lower() or 'x86_64' in a['name'].lower()) and a['name'].endswith(('.tar.gz','.zip'))]
+          if len(candidates)!=1: raise RuntimeError('Expected one Linux amd64 CLI archive, found: '+str([a['name'] for a in candidates]))
+          a=candidates[0]
+          urllib.request.urlretrieve(a['browser_download_url'],'/tmp/pmtiles-cli'+('.zip' if a['name'].endswith('.zip') else '.tar.gz'))
+          print('CLI release:',release['tag_name'],'asset:',a['name'])
+          PY
+          mkdir -p /tmp/pmtiles-bin
+          if [ -f /tmp/pmtiles-cli.zip ]; then unzip -q /tmp/pmtiles-cli.zip -d /tmp/pmtiles-bin; else tar -xzf /tmp/pmtiles-cli.tar.gz -C /tmp/pmtiles-bin; fi
+          find /tmp/pmtiles-bin -type f -name pmtiles -exec chmod +x {} \;
+          cli="$(find /tmp/pmtiles-bin -type f -name pmtiles | head -1)"
+          test -n "$cli"
+          echo "$(dirname "$cli")" >> "$GITHUB_PATH"
+      - name: Extract South Carolina test region
+        env:
+          SOURCE_URL: ${{ inputs.source_pmtiles_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$SOURCE_URL" in https://build.protomaps.com/*.pmtiles) ;; *) echo 'Only official Protomaps build URLs are permitted'; exit 1;; esac
+          mkdir -p output
+          # Bounding box includes SC and adjacent border context; NOT a legal state polygon clip.
+          pmtiles extract "$SOURCE_URL" output/south-carolina-test.pmtiles --bbox=-83.45,31.95,-78.45,35.30
+          pmtiles show output/south-carolina-test.pmtiles > output/pmtiles-metadata.txt
+          sha256sum output/south-carolina-test.pmtiles > output/SHA256SUMS
+          wc -c output/south-carolina-test.pmtiles > output/BYTES
+          printf 'Source: %s\nBounds: -83.45,31.95,-78.45,35.30\nStatus: experimental bbox extract; NOT validated offline; NOT state-clipped\n' "$SOURCE_URL" > output/BUILD-NOTES.txt
+      - name: Preserve experiment as private workflow artifact (not Pages)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-pmtiles-experimental
+          path: output/
+          retention-days: 7
+          if-no-files-found: error
